@@ -1,0 +1,233 @@
+import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
+
+class FirstPage extends StatefulWidget {
+  @override
+  FirstPageState createState() => FirstPageState();
+}
+
+class FirstPageState extends State<FirstPage> {
+  @override
+  void initState() {
+    super.initState();
+    _navigateToHome(context);
+  }
+
+  Future<void> _navigateToHome(BuildContext context) async {
+    await Future.delayed(Duration(milliseconds: 3000));
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => MyForm()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Color(0xfffea5cc),
+        appBar: AppBar(
+          backgroundColor: Color(0xfffec5df),
+          elevation: 0, // removes shadow
+          actions: [
+            IconButton(
+              onPressed: () {},
+              icon: Icon(Icons.logout),
+            ),
+          ],
+        ),
+        body: Center(
+          child: Container(
+            decoration: BoxDecoration(
+              color: Color(0xfffec5df),
+              borderRadius: BorderRadius.circular(150), // curved corners
+            ),
+            height: 350,
+            width: 320,
+            child: Center(
+              child: Image.asset('images/file.png'), // ensure image path is correct
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class MyForm extends StatefulWidget {
+  const MyForm({super.key});
+
+  @override
+  FormState createState() => FormState();
+}
+
+class FormState extends State<MyForm> {
+  final _formKey = GlobalKey<FormState>();
+  TextEditingController dateController = TextEditingController();
+  DateTime? selectedDate;
+
+  @override
+  void dispose() {
+    dateController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const appTitle = 'Enter the first day of your last period';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(appTitle),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: <Widget>[
+              TextFormField(
+                controller: dateController,
+                decoration: const InputDecoration(
+                  icon: Icon(Icons.calendar_today),
+                  labelText: "Select Date",
+                ),
+                readOnly: true,
+                onTap: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2024, 1, 1),
+                    lastDate: DateTime(2026, 1, 1),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      selectedDate = pickedDate; // Store the selected date
+                      dateController.text = pickedDate.toString().split(' ')[0];
+                    });
+                  }
+                },
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  if (selectedDate != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HomePage(
+                          initialDate: selectedDate!,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Text('Submit'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  final DateTime initialDate;
+
+  HomePage({required this.initialDate});
+
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  Map<DateTime, List<Event>> _events = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeEvents();
+  }
+
+  void _initializeEvents() {
+    DateTime strippedInitialDate = DateTime(
+      widget.initialDate.year,
+      widget.initialDate.month,
+      widget.initialDate.day,
+    );
+
+    // Add events from the first day to the last day of the period
+    for (int i = 0; i <= 5; i++) {
+      DateTime currentDate = strippedInitialDate.add(Duration(days: i));
+      if (_events[currentDate] == null) {
+        _events[currentDate] = [];
+      }
+      _events[currentDate]?.add(Event('Period Day ${i + 1}'));
+    }
+
+    // Add events from the first predicted day to the last predicted day
+    DateTime predictedStartDate = strippedInitialDate.add(Duration(days: 28));
+    for (int i = 0; i <= 5; i++) {
+      DateTime currentDate = predictedStartDate.add(Duration(days: i));
+      if (_events[currentDate] == null) {
+        _events[currentDate] = [];
+      }
+      _events[currentDate]?.add(Event('Predicted Period Day ${i + 1}'));
+    }
+
+    setState(() {}); // Refresh the state to apply the events
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: TableCalendar(
+        firstDay: DateTime.utc(2024, 1, 1),
+        lastDay: DateTime.utc(2026, 1, 1),
+        focusedDay: _focusedDay,
+        calendarFormat: _calendarFormat,
+        eventLoader: (day) {
+          return _events.entries
+              .where((entry) => isSameDay(entry.key, day))
+              .map((entry) => entry.value)
+              .expand((events) => events)
+              .toList();
+        },
+        selectedDayPredicate: (day) {
+          return isSameDay(_selectedDay, day);
+        },
+        onDaySelected: (selectedDay, focusedDay) {
+          setState(() {
+            _selectedDay = selectedDay;
+            _focusedDay = focusedDay;
+          });
+        },
+        calendarStyle: CalendarStyle(
+          markerDecoration: BoxDecoration(
+            color: Colors.red, // Color for event markers
+            shape: BoxShape.circle,
+          ),
+          markersAlignment: Alignment.bottomCenter,
+        ),
+      ),
+    );
+  }
+}
+
+class Event {
+  final String title;
+  Event(this.title);
+  @override
+  String toString() => title;
+}
+
+void main() => runApp(MaterialApp(
+      home: FirstPage(),
+    ));
